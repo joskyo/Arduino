@@ -1,0 +1,108 @@
+#include <Arduino.h>
+#include <Wire.h>
+#include <SoftwareSerial.h>
+
+int B,a=0;
+
+void setup(){
+Serial.begin(115200);
+ 
+pinMode(1,OUTPUT);//relay
+pinMode(2,OUTPUT);
+pinMode(3,OUTPUT);  
+pinMode(4,OUTPUT);  
+pinMode(11,OUTPUT);//反向 
+pinMode(10,OUTPUT);
+pinMode(9,INPUT);   
+
+}
+
+
+void loop(){
+   Serial.print("a:");
+   Serial.println(a);
+   a++;
+   B = 1;
+  digitalWrite(11,0);
+  delay(0.001);
+  int c=digitalRead(9);
+ if (c=0){
+  work();
+ }
+ else{ 
+  shift();           
+ }
+}  
+
+
+
+
+void work(){
+        for(int __i__=0;__i__<3;++__i__){//整體作動三次 
+          int b = 0;
+            digitalWrite(1,0);    
+            delay(0.2);    
+            digitalWrite(1,1);   
+            delay(0.1); 
+            digitalWrite(2,0);   
+            delay(0.2);  
+            digitalWrite(2,1);       
+            delay(0.1);    
+            digitalWrite(3,0);      
+            delay(0.2);     
+            digitalWrite(3,1);     
+            delay(0.1);      
+            digitalWrite(4,0);        
+            delay(0.2);      
+            digitalWrite(4,1);        
+            delay(0.1);
+        if(b<2){
+            for(int __i__=0;__i__<96;++__i__){//小格移動    
+                 digitalWrite(10,1);         
+                 delay(0.001);          
+                 digitalWrite(10,0);            
+                 delay(0.001);
+                 }
+              } 
+             b++; 
+             }
+      }
+
+void shift(){
+       if((B) < (3 )){//大格移動判斷
+             Serial.print("B:");
+             Serial.println(B); 
+            for(int __i__=0;__i__<402;++__i__){  
+                  digitalWrite(10,1);       
+                  delay(0.001);            
+                  digitalWrite(10,0);           
+                  delay(0.001);
+                   }
+             }
+       else{//拉回原點
+            digitalWrite(11,1);//觸發反向
+            delay(0.001);
+            for(int __i__=0;__i__<1380;++__i__){//拉回作動
+                  digitalWrite(10,1);  
+                  delay(0.001); 
+                  digitalWrite(10,0);   
+                  delay(0.001);
+                   }
+            }  
+          B++;
+  }
+
+
+
+
+
+
+/*void _delay(float seconds){
+    
+long endTime = millis() + seconds * 1000;
+   
+ while(millis() < endTime)
+  _loop();
+}
+void _loop(){
+}*/
