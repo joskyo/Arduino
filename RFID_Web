@@ -1,0 +1,176 @@
+//從網址選擇功能 新增卡號或開門
+#include <FileIO.h>
+#include <Bridge.h>
+#include <YunServer.h>
+#include <YunClient.h>
+#include <SPI.h>
+#include <MFRC522.h>
+
+int tempPassword[12];
+#define SS    SS_PIN
+#define RST_PIN         9       // Configurable, see typical pin layout above
+#define SS_PIN          10         // Configurable, see typical pin layout above
+unsigned long stime; // 讀卡開始的時間
+MFRC522 mfrc522(SS_PIN, RST_PIN);   // Create MFRC522 instance.
+
+YunServer server;
+
+void setup() {
+  Bridge.begin();
+  Console.begin();
+  FileSystem.begin();         
+  SPI.begin();                // Init SPI bus
+  mfrc522.PCD_Init();         // Init MFRC522 card
+  server.listenOnLocalhost(); // 設定讓伺服器聆聽本地端IP位址的連線
+  server.begin(); // 開始
+  pinMode(13,OUTPUT);
+  pinMode(12,OUTPUT);
+  pinMode(11,OUTPUT);
+}
+
+void loop() {
+  YunClient client = server.accept(); // 有連線進來了
+  if(client){
+    process(client); // 開始處理，分析API
+    client.stop();
+  }
+
+  if (!mfrc522.PICC_IsNewCardPresent())
+      return;
+  if (!mfrc522.PICC_ReadCardSerial())
+      return;
+  pass(mfrc522.uid.uidByte, mfrc522.uid.size);
+  delay(50);
+
+ 
+ 
+}
+
+void process(YunClient client){ //判斷連線
+  String command = client.readStringUntil('\r');
+  if(command == "sid"){ // 讀取SD卡內容
+    sid(client);
+  }
+  else if (command == "add"){ // 卡號新增
+    stime=millis(); //開始計時讀卡
+    add(client);
+  }
+  else if (command == "door"){ // 網頁開門
+    door(client);
+  }
+   
+}
+
+void sid(YunClient client){//讀取SD卡內容
+   File dataFile = FileSystem.open("/mnt/sda1/test.txt", FILE_READ);//開檔
+    if(dataFile){
+      String result;
+      client.println("RFID_CARD_ID:");
+        while(dataFile.available()) {
+         char c = dataFile.read();
+          if(c != '\n')
+            result += c;  
+  }
+    client.println(result);
+    dataFile.close();
+    }
+   else{
+       client.println("ERROR-File_lost!!");
+    }
+ delay(1000);
+}
+
+void add(YunClient client){
+  unsigned long duration ;   // 等待讀卡的時間 
+  client.println("Ready For Card:");
+  delay(50);
+   do{//等待RFID 五秒內
+     if (mfrc522.PICC_IsNewCardPresent()){
+      if (mfrc522.PICC_ReadCardSerial())
+         break;
+      else
+       ;
+       }
+    else
+     ; 
+    duration = millis() - stime; //等待的時間 
+    }while(duration<5000);//是否在五秒內
+   
+   if(duration<5000){
+   writeid(mfrc522.uid.uidByte, mfrc522.uid.size);//寫入卡號
+   delay(500);
+   }
+   else if(duration>5000){  //超過五秒 LED亮一秒提示
+    digitalWrite(11,HIGH);
+    delay(1000);
+    digitalWrite(11,LOW);
+        }
+ client.println("OVER");     
+}
+
+void door(YunClient client){ //開門
+        digitalWrite(12,HIGH);
+        delay(500);
+        digitalWrite(12,LOW);
+       }
+
+ void writeid(byte *buffer, byte bufferSize) {//寫入卡號
+    File dataFile = FileSystem.open("/mnt/sda1/test.txt", FILE_APPEND);
+     if(dataFile){
+       for (byte i = 0; i < bufferSize; i++) {
+        tempPassword[i]= buffer[i] ;      
+        dataFile.print(tempPassword[i]);
+        dataFile.print(' ');
+        delay(200);
+        digitalWrite(13,HIGH);
+        delay(100);
+        digitalWrite(13,LOW);
+          }
+     } 
+       else{
+         // Console.println("File_Error!!");
+          return;
+       }    
+    
+   dataFile.println(',');
+   delay(50);
+   dataFile.close();
+}
+
+void pass(byte *buffer, byte bufferSize) {//RFID開門
+  String result[128];
+  String password;
+  int a=0;
+  int j=0;
+  File dataFile = FileSystem.open("/mnt/sda1/test.txt", FILE_READ);
+  dataFile.seek(a);
+    for (byte i = 0; i < bufferSize; i++) {
+        password +=buffer[i] ; 
+    } 
+  for(int i=0;i<100;i++){
+   char c=dataFile.read();
+   if(c==' ')   
+   ;
+   else if(c=='\r') 
+   ;
+   else if(c==',')
+   j++;
+   else if(c=='\n'){
+    for(int i=0;i<10;i++){  
+     if( password==result[i]){
+        digitalWrite(12,HIGH);
+        delay(500);
+        digitalWrite(12,LOW);
+        return;
+       }  
+     else
+       ;
+   }//for(int i=0;i<128;i++) 
+  }  
+   else{
+        result[j] +=c;
+   }
+ 
+  }
+  dataFile.close();
+}
